@@ -1,9 +1,13 @@
 from symtable import Symbol
 import pandas as pd
 from binance import Client
+import re
 import os
+import pickle
 import time
 from datetime import datetime
+
+from tenacity import retry_if_exception
 
 # To this date (4/16/2022) binance only provides historical trades data 
 # with to "trade id". And currently (To the authors knowledge) there
@@ -135,10 +139,27 @@ def historicalTradIdByDate(symbol:str, targetTime:int, tollerance:int, client = 
     else:
         # Using offline connection for getting the tradeId path is targeting the 
         # folder that is containing the historical trades. The file names has to
-        # be inthe following format: HistoricalTrades_BTCUSDT_{endId}____{startId}.xlsx
+        # be inthe following format: HistoricalTrades_BTCUSDT_{endId}____{startId}.pickle
+        # Note that for increasing the application's performance, we import pickle
+        # objects, instead of reading excel files 
         files = os.listdir(path)
+        pattern = r"HistoricalTrades_BTCUSDT_(\d+)____(\d+).pickle"
+        endTime = 0; startTime = 0
+
         for file in files:
-            print(file)
+            if(file.endswith(".pickle")):          
+                df = pd.read_pickle(os.path.abspath(PATH)+"//"+file )
+                startTime = df["time"].iloc[0]
+                endTime = df["time"].iloc[-1]
+                
+                # print(f"{startTime} ({targetTime - startTime}) {targetTime} ({endTime-targetTime}) {endTime}")
+
+                if (startTime <= targetTime and targetTime <= endTime):
+                    nearestIndex = (df["time"]-targetTime).abs().idxmin()
+                    return df["id"].iloc[nearestIndex]
+            
+
+            
 
 
 client = Client(api_key = "gcJLtOs6tZYTOBEyIYY0JZBDagmFMkc5SY5T8R792cCUgBn7YCLfG7pOJZG3J36x")
@@ -146,9 +167,10 @@ client = Client(api_key = "gcJLtOs6tZYTOBEyIYY0JZBDagmFMkc5SY5T8R792cCUgBn7YCLfG
 #Defining the necessary variables
 SYMBOL  = "BTCUSDT"
 PATH = "../../Data/HistoricalTrades/"
-targetTime = 1649501571721
+targetTime = 1650768807449
 tollerance = 1000 # time milliseconds
 
 # id = historicalTradIdByDate(SYMBOL, client, targetTime, tollerance, verbouse = True)
 # print(f"ID: {id}")
-historicalTradIdByDate(symbol = SYMBOL, targetTime = targetTime, tollerance = tollerance, online = False, path = PATH)
+id = historicalTradIdByDate(symbol = SYMBOL, targetTime = targetTime, tollerance = tollerance, online = False, path = PATH)
+print(id)
